@@ -4,7 +4,7 @@
 "
 " Author: Noriaki Yagi <no_yag@yahoo.co.jp>
 " Version: $Id: skk.vim,v 0.22 2006/10/11 09:26:53 noriaki Exp noriaki $
-" Last Change: 2010-09-25.
+" Last Change: 2011-01-12.
 "
 " 使い方:
 " skk_jisyo および skk_large_jisyo を適宜変更する。
@@ -2796,6 +2796,10 @@ endif
 if !exists('skk_large_jisyo_encoding')
   let skk_large_jisyo_encoding = 'guess'
 endif
+
+if !exists('skk_external_prog_encoding')
+  let skk_external_prog_encoding = ''
+endif
 " }}}
 
 " script variables {{{
@@ -2952,6 +2956,11 @@ function! s:SkkCursorCol()
       return getcmdpos()
     endif
   endif
+endfunction
+
+function! s:SkkMarkerCol(marker)
+  let line = strpart(s:SkkGetLine('.'), 0, s:SkkCursorCol() - 1)
+  return strridx(line, a:marker) + 1
 endfunction
 
 " SkkWait sec秒間待つ。何か入力があれば、その文字を返す。
@@ -3366,6 +3375,7 @@ function! SkkToggleKana(kana)
     let kana = strpart(s:SkkGetLine("."), hstart, ostart - 1 - hstart) . kana
     call s:SkkEraseYomi()
     let b:skk_henkan_mode = 0
+    let &l:formatoptions = b:skk_fo_save
     return b:skk_mode == 'hira' ? s:SkkHira2Kata(kana) : s:SkkKata2Hira(kana)
   else
     return b:skk_mode == 'hira' ? SkkKataMode(a:kana) : SkkHiraMode(a:kana)
@@ -3382,6 +3392,7 @@ function! SkkAbbrev2Zenei()
   call s:SkkEraseYomi()
   let b:skk_henkan_mode = 0
   let b:skk_abbrev_mode_on = 0
+  let &l:formatoptions = b:skk_fo_save
   return s:SkkAscii2Zenei(str)
 endfunction
 
@@ -3649,6 +3660,7 @@ function! s:SkkCancel()
     call s:SkkEraseYomi()
     let b:skk_henkan_mode = 0
     let b:skk_abbrev_mode_on = 0
+    let &l:formatoptions = b:skk_fo_save
   elseif b:skk_henkan_mode >= 3
     call s:SkkFaceOff()
     call s:SkkEraseYomi()
@@ -3831,12 +3843,15 @@ function! s:SkkInsert(char)
       elseif b:skk_henkan_mode == 0 && a:char == g:skk_sticky_key
         return SkkSetHenkanPoint('')
       elseif b:skk_henkan_mode == 1 && a:char == g:skk_sticky_key
+        let b:skk_hstart = s:SkkMarkerCol(g:skk_marker_white)
         if !s:SkkCheckMarker(g:skk_marker_white, b:skk_hstart)
           let b:skk_henkan_mode = 0
+          let &l:formatoptions = b:skk_fo_save
           throw "skk cannot find " . g:skk_marker_white . " mark"
         endif
         " g:skk_sticky_key 連続押下で g:skk_sticky_key 自体を返す
         " ;; で ▽* 、;k; で ▽* ではなく、; になるように
+        let rom = b:skk_rom != 'n' ? b:skk_rom : ''
         let kana = s:SkkCleanRom() " kana は n の場合に ん になる
         if kana == '' && s:SkkCursorCol() == b:skk_hstart +
               \ strlen(g:skk_marker_white)
@@ -3851,7 +3866,7 @@ function! s:SkkInsert(char)
         let b:skk_rstart = strlen(kana) + b:skk_rstart +
               \ strlen(g:skk_marker_okuri)
         let b:skk_henkan_mode = 2
-        return kana . g:skk_marker_okuri
+        return kana . g:skk_marker_okuri . s:SkkInsertKana(rom)
       elseif stridx(g:skk_henkan_point_keys, a:char) != -1 && b:skk_abbrev_mode_on == 0
         return SkkSetHenkanPoint(a:char)
       elseif b:skk_henkan_mode == 1 && a:char ==# g:skk_start_henkan_key
@@ -3872,6 +3887,9 @@ function! s:SkkInsert(char)
         " Force AsciiMode
         return SkkAsciiMode("")
       else
+        if b:skk_henkan_mode == 0
+          let &l:formatoptions = b:skk_fo_save
+        endif
         return s:SkkInsertKana(a:char)
       endif
     catch /^skk .* mark$/
@@ -4002,8 +4020,10 @@ function! SkkSetHenkanPoint(char)
     let kana = SkkSetHenkanPoint1("")
     return kana . s:SkkInsertKana(s:SkkDowncase(a:char))
   elseif b:skk_henkan_mode == 1
+    let b:skk_hstart = s:SkkMarkerCol(g:skk_marker_white)
     if !s:SkkCheckMarker(g:skk_marker_white, b:skk_hstart)
       let b:skk_henkan_mode = 0
+      let &l:formatoptions = b:skk_fo_save
       throw "skk cannot find " . g:skk_marker_white . " mark"
     endif
     let kana = s:SkkInsertKana(s:SkkDowncase(a:char))
@@ -4030,13 +4050,16 @@ function! SkkSetHenkanPoint(char)
       endif
     endif
   else	" b:skk_henkan_mode == 2
+    let b:skk_ostart = s:SkkMarkerCol(g:skk_marker_okuri)
     if !s:SkkCheckMarker(g:skk_marker_okuri, b:skk_ostart)
       let b:skk_henkan_mode = 1
       let b:skk_ostart = 0
       throw "skk cannot find " . g:skk_marker_okuri . " mark"
     endif
+    let b:skk_hstart = s:SkkMarkerCol(g:skk_marker_white)
     if !s:SkkCheckMarker(g:skk_marker_white, b:skk_hstart)
       let b:skk_henkan_mode = 0
+      let &l:formatoptions = b:skk_fo_save
       throw "skk cannot find " . g:skk_marker_white . " mark"
     endif
     if a:char ==# g:skk_start_henkan_key
@@ -4181,8 +4204,10 @@ function! SkkStartHenkan(...)
     endif
   else
     " 初めての変換
+    let b:skk_hstart = s:SkkMarkerCol(g:skk_marker_white)
     if !s:SkkCheckMarker(g:skk_marker_white, b:skk_hstart)
       let b:skk_henkan_mode = 0
+      let &l:formatoptions = b:skk_fo_save
       throw "skk cannot find " . g:skk_marker_white . " mark"
     endif
     let kana = s:SkkCleanRom()
@@ -4200,6 +4225,7 @@ function! SkkStartHenkan(...)
     if b:skk_midasi == ""
       call s:SkkEraseYomi()
       let b:skk_henkan_mode = 0
+      let &l:formatoptions = b:skk_fo_save
       return ""
     endif
     if b:skk_mode == 'kata'
@@ -4292,6 +4318,7 @@ function! s:SkkKakutei()
   let b:skk_romv = ''
   let b:skk_rstart = 0
   let b:skk_abbrev_mode_on = 0
+  let &l:formatoptions = b:skk_fo_save
   call s:SkkSetCursorColor()
   return kana
 endfunction
@@ -4326,6 +4353,7 @@ function! s:SkkSelectCandidate()
       let saved_cmdheight = &cmdheight
       let &cmdheight = lines
     endif
+    redraw
     echo str
     while 1
       " TODO ここで関数の入れ子が深くなってしまうのをなんとかしたい。
@@ -4424,6 +4452,7 @@ function! s:SkkTourokuMode()
     let s:skk_in_touroku = 1
     call SkkMap(0)
     cnoremap <buffer> <C-g> <C-\>e<SID>SkkCmdCancel()<CR>
+    cnoremap <buffer> <C-c> <C-\>e<SID>SkkCmdCancel()<CR>
     let cmd = "call cursor(" . line(".") . ", " . col(".") . ")"
   endif
   let prev = s:SkkGetLine(0)
@@ -4434,6 +4463,7 @@ function! s:SkkTourokuMode()
   try
     let b:skk_henkan_mode = 0
     let b:skk_abbrev_mode_on = 0
+    let &l:formatoptions = b:skk_fo_save
     let &imsearch = 1
     redraw
     let result = input(str . " ")
@@ -4449,12 +4479,14 @@ function! s:SkkTourokuMode()
       let result = s:SkkGetCandStrConverted(old_count)
       if b:skk_cand_count - old_count == 1
         let b:skk_henkan_mode = 0
+        let &l:formatoptions = b:skk_fo_save
       else
         let result = g:skk_marker_black . result
         call s:SkkFaceOn(result)
       endif
     else
       let b:skk_henkan_mode = 0
+      let &l:formatoptions = b:skk_fo_save
     endif
     if b:skk_henkan_mode == 0
       let b:skk_abbrev_mode_on = 0
@@ -4561,7 +4593,13 @@ function! s:SkkSearch(large)
   if cand == '' || a:large
     if g:skk_external_prog != ""
       if b:skk_henkan_key !~ "'"
-        let cand = system(g:skk_external_prog . " '" . b:skk_henkan_key . "'")
+        if g:skk_external_prog_encoding == ''
+          let cand = system(g:skk_external_prog . " '" . b:skk_henkan_key . "'")
+        else
+          let key = iconv(b:skk_henkan_key, &enc, g:skk_external_prog_encoding)
+          let cand = system(g:skk_external_prog . " '" . key . "'")
+          let cand = iconv(cand, g:skk_external_prog_encoding, &enc)
+        endif
       endif
     else
       let buf = s:SkkGetJisyoBuf("skk_large_jisyo")
@@ -4960,6 +4998,7 @@ function! SkkPurgeFromJisyo()
   call s:SkkFaceOff()
   call s:SkkEraseYomi()
   let b:skk_henkan_mode = 0
+  let &l:formatoptions = b:skk_fo_save
   return ""
 endfunction
 
