@@ -107,16 +107,8 @@ if !exists("skk_purge_cand_key")
   let skk_purge_cand_key = "X"
 endif
 
-if !exists('skk_enable_jlod_layout')
-  let skk_enable_jlod_layout = 0
-endif
-
 if !exists('skk_keyboard_layout')
-  if g:skk_enable_jlod_layout
-    let skk_keyboard_layout = 'jlod'
-  else
-    let skk_keyboard_layout = 'normal'
-  endif
+  let skk_keyboard_layout = 'normal'
 endif
 
 if !exists("skk_henkan_point_keys")
