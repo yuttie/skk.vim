@@ -115,7 +115,7 @@ if !exists("skk_henkan_point_keys")
   if g:skk_keyboard_layout ==# 'jlod'
     let skk_henkan_point_keys = 'ABCDEFGHIJKMNOPQRSTUVWXZ":<>'
   elseif g:skk_keyboard_layout ==# 'act'
-    let skk_henkan_point_keys = 'ABCDEFGHIJKMNOPQRSTUVWXZ":<>'
+    let skk_henkan_point_keys = 'ABCDEFGHIJKMNOPQRSTUVWXYZ":<>'
   elseif g:skk_keyboard_layout ==# 'azik'
     let skk_henkan_point_keys = 'ABCDEFGHIJKMNOPRSTUVWXYZ'
   else
